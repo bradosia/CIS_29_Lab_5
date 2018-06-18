@@ -1,46 +1,29 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <diagram program="umlet" version="14.2">
-  <zoom_level>8</zoom_level>
+  <zoom_level>7</zoom_level>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>848</x>
-      <y>192</y>
-      <w>528</w>
-      <h>136</h>
+      <x>770</x>
+      <y>560</y>
+      <w>462</w>
+      <h>63</h>
     </coordinates>
-    <panel_attributes>CharacterPriorityQueueTree
+    <panel_attributes>DocumentExtractor
 bg=yellow
 --
-shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; characterPriorityQueueTreePtr
-shared_ptr&lt;HashTable&lt;unsigned int, string&gt;&gt; characterToBinaryTablePtr
+
 --
-CharacterPriorityQueueTree()
-~CharacterPriorityQueueTree()
-bool buildTree(priorityQueueType priorityQueue)
-bool buildBinaryTable()
-void buildBinaryTableEncode(shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; node, string binaryString)
-shared_ptr&lt;HashTable&lt;unsigned int, string&gt;&gt; getCharacterToBinaryTable()</panel_attributes>
+void extract(XMLNode&amp; XML_Document, DocumentDatabase&amp; documentDatabase)</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1200</x>
-      <y>320</y>
-      <w>24</w>
-      <h>48</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;40.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>0</x>
-      <y>192</y>
-      <w>392</w>
-      <h>136</h>
+      <x>182</x>
+      <y>224</y>
+      <w>343</w>
+      <h>119</h>
     </coordinates>
     <panel_attributes>FileHandler
 --
@@ -58,105 +41,24 @@ bool close(ofstream&amp; fileStream) throw (unsigned int)</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>0</x>
-      <y>80</y>
-      <w>288</w>
-      <h>64</h>
+      <x>182</x>
+      <y>147</y>
+      <w>406</w>
+      <h>56</h>
     </coordinates>
     <panel_attributes>UML Diagram
-Lab 4 - Encryption and Compression
-Use a priority_queue to simulate a binary_tree
+Lab 5 - Graphs
+PageRank Algorithm using STL Algorithms, Containers and advanced C++ features
 By: Branden Lee</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>224</x>
-      <y>368</y>
-      <w>280</w>
-      <h>72</h>
-    </coordinates>
-    <panel_attributes>&lt;class T&gt; CharacterPriorityQueueCompare
-bg=orange
---
-
---
-bool operator&lt;(const CharacterFrequencyNode &amp;rhs)
-bool operator&gt;(const CharacterFrequencyNode &amp;rhs)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>160</x>
-      <y>472</y>
-      <w>472</w>
-      <h>96</h>
-    </coordinates>
-    <panel_attributes>CharacterFrequencyNode
-bg=orange
---
-
---
-unsigned int frequency
-unsigned int characterCode
-CharacterFrequencyNode(unsigned int frequency_, unsigned int characterCode_)
-bool operator&lt;(const CharacterFrequencyNode &amp;lhs, const CharacterFrequencyNode &amp;rhs)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1144</x>
-      <y>352</y>
-      <w>248</w>
-      <h>112</h>
-    </coordinates>
-    <panel_attributes>CharacterPriorityQueueTreeNode
-bg=yellow
---
-
---
-unsigned int frequency
-CharacterPriorityQueueTreeNode()
-virtual ~CharacterPriorityQueueTreeNode()
-virtual bool isLeaf()
-virtual bool isBranch()</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1392</x>
-      <y>664</y>
-      <w>480</w>
-      <h>176</h>
-    </coordinates>
-    <panel_attributes>CharacterToBinaryTable
-bg=green
---
-shared_ptr&lt;HashTable&lt;unsigned int, string&gt;&gt; characterCodeToBinaryStringTablePtr
-shared_ptr&lt;HashTable&lt;string, unsigned int&gt;&gt; binaryStringToCharacterCodeTablePtr
-CharacterPriorityQueueTreeNode characterPriorityQueueTreeNodeParent
---
-CharacterToBinaryTable()
-~CharacterToBinaryTable()
-void set(shared_ptr&lt;HashTable&lt;unsigned int, string&gt;&gt; tablePtr)
-void set(shared_ptr&lt;HashTable&lt;string, unsigned int&gt;&gt; tablePtr)
-void buildBinaryStringToCharacterCodeTable()
-void buildCharacterCodeToBinaryStringTable()
-bool characterCodeToBinaryString(unsigned int characterCode, string&amp; binaryString)
-bool binaryStringToCharacterCode(string characterBinaryString, unsigned int characterCode)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
     <id>Relation</id>
     <coordinates>
-      <x>720</x>
-      <y>320</y>
-      <w>24</w>
-      <h>72</h>
+      <x>882</x>
+      <y>322</y>
+      <w>21</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=&lt;-</panel_attributes>
     <additional_attributes>10.0;70.0;10.0;10.0</additional_attributes>
@@ -164,327 +66,97 @@ bool binaryStringToCharacterCode(string characterBinaryString, unsigned int char
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1400</x>
-      <y>192</y>
-      <w>344</w>
-      <h>152</h>
+      <x>770</x>
+      <y>224</y>
+      <w>357</w>
+      <h>105</h>
     </coordinates>
-    <panel_attributes>Compressor : StreamScanner
-bg=green
---
-shared_ptr&lt;CharacterToBinaryTable&gt; characterToBinaryTablePtr
-string streamBufferOut
-ostream streamOut
---
-Compressor()
-~Compressor()
-void set(shared_ptr&lt;CharacterToBinaryTable&gt; tablePtr)
-bool stream(istream&amp; streamIn, ostream&amp; streamOut)
-bool bufferHandle(string&amp; streamBuffer, bool final)
-bool bufferOutHandle(string&amp; streamBufferOut, bool final)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1688</x>
-      <y>336</y>
-      <w>24</w>
-      <h>344</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;410.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>0</x>
-      <y>152</y>
-      <w>1128</w>
-      <h>24</h>
-    </coordinates>
-    <panel_attributes>using priorityQueueType = std::priority_queue&lt;shared_ptr&lt;CharacterPriorityQueueTreeNode&gt;, vector&lt;shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; &gt;, CharacterPriorityQueueCompare&lt;shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; &gt; &gt;</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>416</x>
-      <y>192</y>
-      <w>408</w>
-      <h>136</h>
-    </coordinates>
-    <panel_attributes>CharacterPriorityQueue : StreamScanner
+    <panel_attributes>DocumentDatabase
 bg=orange
 --
-HashTable&lt;unsigned int, shared_ptr&lt;unsigned int&gt; &gt; characterFrequencyTable
-unique_ptr&lt;priorityQueueType&gt; priorityQueue
+vector&lt;shared_ptr&lt;vector&lt;bool&gt;&gt;&gt; adjacencyMatrix
+vector&lt;shared_ptr&lt;HTMLDocument&gt;&gt; documentList
 --
-CharacterPriorityQueue()
-~CharacterPriorityQueue()
-bool stream(istream&amp; streamIn)
-bool bufferHandle(string&amp; streamBuffer, bool final)
-bool buildPriorityQueue()
-reference_wrapper&lt;priorityQueueType&gt; getPriorityQueue()</panel_attributes>
+void addDocument(shared_ptr&lt;HTMLDocument&gt; document)
+void createGraph()
+void calculatePageRank()
+string getAllPageRank()</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
-    <id>Relation</id>
+    <id>UMLClass</id>
     <coordinates>
-      <x>432</x>
-      <y>320</y>
-      <w>24</w>
-      <h>64</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;60.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>560</x>
-      <y>320</y>
-      <w>24</w>
+      <x>770</x>
+      <y>371</y>
+      <w>217</w>
       <h>168</h>
     </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;190.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>864</x>
-      <y>320</y>
-      <w>24</w>
-      <h>360</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;430.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1016</x>
-      <y>688</y>
-      <w>392</w>
-      <h>24</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;10.0;470.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>688</x>
-      <y>752</y>
-      <w>248</w>
-      <h>184</h>
-    </coordinates>
-    <panel_attributes>HashTable&lt;K keyType, T valueType&gt;
---
-vector&lt;unique_ptr&lt;pair&lt;K, T&gt;&gt;&gt; table
-unsigned int insertAttempts
-hash&lt;K&gt; hashT;
-hash&lt;size_t&gt; hashSize;
---
-HashTable()
-HashTable(size_t size)
-~HashTable()
-bool insert(K key, T val)
-bool at(K key, T&amp; val)
-bool atIndex(size_t index, K&amp; key, T&amp; val)
-size_t size()
-bool resize(size_t key);</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>864</x>
-      <y>696</y>
-      <w>88</w>
-      <h>72</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
-&lt;&lt;instanceOf&gt;&gt;</panel_attributes>
-    <additional_attributes>10.0;70.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>664</x>
-      <y>376</y>
-      <w>168</w>
-      <h>40</h>
-    </coordinates>
-    <panel_attributes>_object: HashTable_
+    <panel_attributes>HTMLDocument
 bg=orange
 --
-characterFrequencyTable</panel_attributes>
+string title_
+unsigned int linkOutNum_
+unsigned int linkInNum_
+vector&lt;shared_ptr&lt;string&gt;&gt; linkOutList
+--
+void setTitle(string title)
+void setLinkOutNum(unsigned int linkOutNum)
+void setLinkInNum(unsigned int linkInNum)
+string getTitle()
+unsigned int getLinkOutNum()
+unsigned int getLinkInNum()
+void addLinkOut(string title)
+vector&lt;shared_ptr&lt;string&gt;&gt; getLinkOutList()</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>824</x>
-      <y>664</y>
-      <w>200</w>
-      <h>40</h>
+      <x>182</x>
+      <y>441</y>
+      <w>567</w>
+      <h>266</h>
     </coordinates>
-    <panel_attributes>_object: HashTable_
-bg=yellow
+    <panel_attributes>XMLNode : public std::enable_shared_from_this&lt;XMLNode&gt;
+bg=green
 --
-characterCodeToBinaryStringTable</panel_attributes>
+string name_
+string value_
+vector&lt;shared_ptr&lt;XMLNode&gt;&gt; childNodes
+regex tagOpenRegex
+regex tagEndRegex
+--
+XMLNode()
+XMLNode(string name)
+~XMLNode()
+bool parseStream(ifstream&amp; streamIn)
+bool parseStream(istream&amp; streamIn)
+bool streamBufferHandle(string&amp; streamBuffer, bool final, stack&lt;shared_ptr&lt;XMLNode&gt;&gt;&amp; documentStack, unsigned int&amp; mode)
+bool nodePop(string&amp; tagString, stack&lt;shared_ptr&lt;XMLNode&gt;&gt;&amp; documentStack)
+bool nodePush(string&amp; tagString, stack&lt;shared_ptr&lt;XMLNode&gt;&gt;&amp; documentStack)
+void valueAppend(string str)
+string getName()
+string getValue()
+shared_ptr&lt;XMLNode&gt; addChild(string str)
+shared_ptr&lt;XMLNode&gt; getChild(unsigned int index)
+bool findChild(string name_, shared_ptr&lt;XMLNode&gt;&amp; returnNode, unsigned int index)
+unsigned int childrenSize()
+unsigned int findChildSize(string name)</panel_attributes>
     <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>720</x>
-      <y>408</y>
-      <w>88</w>
-      <h>360</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;.
-&lt;&lt;instanceOf&gt;&gt;</panel_attributes>
-    <additional_attributes>10.0;430.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>888</x>
-      <y>504</y>
-      <w>336</w>
-      <h>112</h>
-    </coordinates>
-    <panel_attributes>CharacterPriorityQueueTreeLeaf
-bg=yellow
---
-shared_ptr&lt;CharacterFrequencyNode&gt; characterFrequencyNode
---
-CharacterPriorityQueueTreeLeaf(charNode)
-virtual ~CharacterPriorityQueueTreeLeaf()
-virtual bool isLeaf()
-virtual bool isBranch()
-shared_ptr&lt;CharacterFrequencyNode&gt; getCharacterNode()</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1176</x>
-      <y>456</y>
-      <w>72</w>
-      <h>64</h>
-    </coordinates>
-    <panel_attributes>lt=.&gt;
-&lt;&lt;extends&gt;&gt;</panel_attributes>
-    <additional_attributes>10.0;60.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1304</x>
-      <y>504</y>
-      <w>296</w>
-      <h>136</h>
-    </coordinates>
-    <panel_attributes>CharacterPriorityQueueTreeBranch
-bg=yellow
---
-shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; left
-shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; right
---
-CharacterPriorityQueueTreeBranch(left, right)
-~CharacterPriorityQueueTreeBranch()
-virtual bool isLeaf()
-virtual bool isBranch()
-shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; getLeft()
-shared_ptr&lt;CharacterPriorityQueueTreeNode&gt; getRight()</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1320</x>
-      <y>456</y>
-      <w>72</w>
-      <h>64</h>
-    </coordinates>
-    <panel_attributes>lt=.&gt;
-&lt;&lt;extends&gt;&gt;</panel_attributes>
-    <additional_attributes>10.0;60.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>976</x>
-      <y>824</y>
-      <w>304</w>
-      <h>112</h>
+      <x>182</x>
+      <y>364</y>
+      <w>427</w>
+      <h>56</h>
     </coordinates>
     <panel_attributes>StreamScanner
 --
 
 --
-string streamScannerBuffer;
-StreamScanner()
-virtual ~StreamScanner()
-bool scanStream(istream&amp; streamIn)
-virtual bool bufferHandle(string&amp; streamBuffer, bool final)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>1768</x>
-      <y>192</y>
-      <w>344</w>
-      <h>152</h>
-    </coordinates>
-    <panel_attributes>Extractor : StreamScanner
-bg=green
---
-shared_ptr&lt;CharacterToBinaryTable&gt; characterToBinaryTablePtr
-string streamBufferOut
-ostream streamOut
---
-Compressor()
-~Compressor()
-void set(shared_ptr&lt;CharacterToBinaryTable&gt; tablePtr)
-bool stream(istream&amp; streamIn, ostream&amp; streamOut)
-bool bufferHandle(string&amp; streamBuffer, bool final)
-bool bufferOutHandle(string&amp; streamBufferOut, bool final)</panel_attributes>
-    <additional_attributes/>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>1808</x>
-      <y>336</y>
-      <w>24</w>
-      <h>344</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;-</panel_attributes>
-    <additional_attributes>10.0;410.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>UMLClass</id>
-    <coordinates>
-      <x>336</x>
-      <y>640</y>
-      <w>192</w>
-      <h>96</h>
-    </coordinates>
-    <panel_attributes>FileData
-bg=orange
---
-unsigned int fileSize;
---
-FileData()
-~FileData()
-bool stream(istream&amp; streamIn)
-unsigned int getFileSize()</panel_attributes>
+bool scanStream(istream&amp; streamIn, std::function&lt;void(string&amp;, bool)&gt; bufferHandleCallback)</panel_attributes>
     <additional_attributes/>
   </element>
 </diagram>

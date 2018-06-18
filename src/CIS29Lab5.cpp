@@ -1,17 +1,16 @@
 //============================================================================
-// Name        : Lab4
+// Name        : Lab5
 // Author      : Branden Lee
 // Date        : 5/30/2018
 // Description : Encryption and Compression
 //============================================================================
 
 /**
- * Objectives:
- * 1. No raw pointers
- * 	In previous labs I used raw pointers frequently. My labs assume the compiler is "dumb"
- * 	and does not perform optimizations very well, such as RVO (Return Value Optimization).
- * 	In this lab I have attempted to use smart pointers and references. I still do not return objects
- * 	by value even though any modern compiler should optimize this very well.
+ * Project Assessment:
+ * In a preliminary overview of the project and the input file, I determined
+ * that the amalgamated HTML document "PageRank.html" is not valid HTML and is missing many closing tags.
+ * Despite this, I have attempted to use my general XML parser from lab 3
+ * to parse the document and find the outbound link nodes
  */
 
 #include <string>
@@ -22,12 +21,11 @@
 #include <vector>			// std::vector
 #include <stack>
 #include <queue>			// std::priority_queue
-#include <cstring>
 #include <memory>			// std::unique_ptr
-#include <functional>		// std::hash
-#include <bitset>			// std::bitset
-#include <stdarg.h>			// std::va_list
 #include <unordered_map>	// std::unordered_map
+#include <regex>			// std::regex_match
+#include <functional>		// std::function
+#include <string_view>		// std::string_view
 using namespace std;
 
 /** Buffer size for reading in files for parsing */
@@ -51,108 +49,11 @@ public:
 	 @param string File name to open
 	 @return True on file open successful and false in not
 	 */
-	bool readStream(string fileName, ifstream& fileStream);
-	bool writeStream(string fileName, ofstream& fileStream);
-	bool writeString(string fileName, string stringValue);
-	bool close(ifstream& fileStream);
-	bool close(ofstream& fileStream);
-};
-
-/**
- @class CharacterFrequencyNode
- similar to std::pair<unsigned int, unsigned int> except has that operator< overloaded \n
- first = frequency \n
- second = ascii character code \n
- */
-class CharacterFrequencyNode {
-public:
-	unsigned int frequency, characterCode;
-	CharacterFrequencyNode(unsigned int frequency_,
-			unsigned int characterCode_);
-	// "this" is already the left hand side
-	bool operator<(const CharacterFrequencyNode &rhs) {
-		return frequency < rhs.frequency;
-	}
-	bool operator>(const CharacterFrequencyNode &rhs) {
-		return frequency > rhs.frequency;
-	}
-};
-
-/**
- @class CharacterPriorityQueueTreeNode
- */
-class CharacterPriorityQueueTreeNode {
-private:
-public:
-	unsigned int frequency;
-	CharacterPriorityQueueTreeNode() :
-			frequency(0) {
-
-	}
-	virtual ~CharacterPriorityQueueTreeNode() {
-
-	}
-	unsigned int getFrequency();
-	virtual bool isLeaf() {
-		return false;
-	}
-	virtual bool isBranch() {
-		return false;
-	}
-};
-
-/**
- @class CharacterPriorityQueueTreeLeaf
- */
-class CharacterPriorityQueueTreeLeaf: public CharacterPriorityQueueTreeNode {
-private:
-	shared_ptr<CharacterFrequencyNode> characterFrequencyNode;
-public:
-	CharacterPriorityQueueTreeLeaf(
-			shared_ptr<CharacterFrequencyNode> characterNode) :
-			characterFrequencyNode(characterNode) {
-		frequency = characterNode->frequency;
-	}
-	~CharacterPriorityQueueTreeLeaf() {
-
-	}
-	bool isLeaf();
-	bool isBranch();
-	shared_ptr<CharacterFrequencyNode> getCharacterNode();
-};
-
-/**
- @class CharacterPriorityQueueTreeBranch
- */
-class CharacterPriorityQueueTreeBranch: public CharacterPriorityQueueTreeNode {
-private:
-	shared_ptr<CharacterPriorityQueueTreeNode> left, right;
-public:
-	CharacterPriorityQueueTreeBranch(
-			shared_ptr<CharacterPriorityQueueTreeNode> left_,
-			shared_ptr<CharacterPriorityQueueTreeNode> right_) :
-			left(left_), right(right_) {
-		frequency = left_->getFrequency() + right_->getFrequency();
-	}
-	~CharacterPriorityQueueTreeBranch() {
-
-	}
-	bool isLeaf();
-	bool isBranch();
-	shared_ptr<CharacterPriorityQueueTreeNode> getLeft();
-	shared_ptr<CharacterPriorityQueueTreeNode> getRight();
-};
-
-/**
- * @class CharacterPriorityQueueCompare
- * Function object for performing comparisons. Uses operator< on type T. \n
- */
-template<class T>
-class CharacterPriorityQueueCompare {
-public:
-	bool operator()(const T &lhs, const T &rhs) const {
-		return lhs->getFrequency() > rhs->getFrequency();
-	}
+	void readStream(string fileName, ifstream& fileStream) throw (unsigned int);
+	void writeStream(string fileName, ofstream& fileStream) throw (unsigned int);
+	void writeString(string fileName, string stringValue) throw (unsigned int);
+	void close(ifstream& fileStream) throw (unsigned int);
+	void close(ofstream& fileStream) throw (unsigned int);
 };
 
 /**
@@ -161,294 +62,154 @@ public:
  */
 class StreamScanner {
 public:
-	StreamScanner() {
-
-	}
-	virtual ~StreamScanner() {
-
-	}
-	bool scanStream(istream& streamIn, ...);
-	virtual bool bufferHandle(string& streamBuffer, bool final, va_list& args) {
-		return false;
-	}
+	static bool scanStream(istream& streamIn,
+			std::function<void(string&, bool)> bufferHandleCallback);
 };
 
 /**
- * @class FileData
- * holds some data about the original file for the decompressor \n
+ @class XMLNode
+ XML document node \n
  */
-class FileData {
+class XMLNode: public std::enable_shared_from_this<XMLNode> {
 private:
-	unsigned int fileSize;
+	string name_; // tag name inside the angled brackets <name>
+	string value_; // non-child-node inside node <>value</>
+	vector<shared_ptr<XMLNode>> childNodes;
+	/* 2018-06-04 Revision 2
+	 * XMLNode.parentNode was removed because it could lead to circular references
+	 * */
+	regex tagOpenRegex, tagEndRegex;
 public:
-	FileData() :
-			fileSize(0) {
+	XMLNode() :
+			name_(""), value_(""), tagOpenRegex("\\<(.*?)\\>"), tagEndRegex(
+					"\\<\\/(.*?)\\>") {
+	}
+	XMLNode(string name) :
+			name_(name), value_(""), tagOpenRegex("\\<(.*?)\\>"), tagEndRegex(
+					"\\<\\/(.*?)\\>") {
+	}
+	~XMLNode() {
 
 	}
-	~FileData() {
-	}
-	bool stream(istream& streamIn);
-	unsigned int getFileSize();
+	bool parseStream(ifstream& streamIn);
+	bool parseStream(istream& streamIn);
+	bool streamBufferHandle(string& streamBuffer, bool final,
+			stack<shared_ptr<XMLNode>>& documentStack, unsigned int& mode);
+	bool nodePop(string& tagString, stack<shared_ptr<XMLNode>>& documentStack);
+	bool nodePush(string& tagString, stack<shared_ptr<XMLNode>>& documentStack);
+	void valueAppend(string str);
+	/* not a comprehensive list of definitions for all getters/setters
+	 * it is not vital to the program to have all setters
+	 */
+	string getName();
+	string getValue();
+	/* 2018-06-04 Revision 2
+	 * XMLNode.getParent() was removed because it could lead to circular references
+	 * */
+	shared_ptr<XMLNode> addChild(string str);
+	shared_ptr<XMLNode> getChild(unsigned int index);
+	bool findChild(string name, shared_ptr<XMLNode>& returnNode,
+			unsigned int index);
+	unsigned int childrenSize();
+	unsigned int findChildSize(string name);
 };
 
 /**
- * The priority queue type is long so we make it into an alias
- * using is used rather than typedef because of this forum:
- * https://stackoverflow.com/questions/10747810/what-is-the-difference-between-typedef-and-using-in-c11
+ * @class HTMLDocument
  */
-using priorityQueueType = std::priority_queue<shared_ptr<CharacterPriorityQueueTreeNode>, vector<shared_ptr<CharacterPriorityQueueTreeNode>>, CharacterPriorityQueueCompare<shared_ptr<CharacterPriorityQueueTreeNode>>>;
-
-/**
- * @class CharacterPriorityQueue
- * document -> unordered_map -> priority_queue -> set -> binary string \n
- */
-class CharacterPriorityQueue: public StreamScanner {
+class HTMLDocument {
 private:
-	/** unordered_map<character code, character frequency>
-	 * character frequency is a shared pointer to make it easy to increment */
-	unordered_map<unsigned int, shared_ptr<unsigned int>> characterFrequencyTable;
-	priorityQueueType priorityQueue;
+	string title_;
+	unsigned int linkOutNum_, linkInNum_;
+	vector<shared_ptr<string>> linkOutList;
 public:
-	CharacterPriorityQueue() {
-		// enough for ascii characters
-		characterFrequencyTable.reserve(255);
-	}
-	~CharacterPriorityQueue() {
-	}
-	/**
-	 * parses document into a character frequency table \n
-	 * Afterward, call <pre>buildPriorityQueue()</pre> to build the priority queue
-	 * @return true on parse success, false on failure
-	 */
-	bool stream(istream& streamIn);
-	bool bufferHandle(string& streamBuffer, bool final, va_list& args);
-	/**
-	 * builds the priority queue from the character frequency table
-	 * @return true on build success, false on failure
-	 */
-	bool buildPriorityQueue();
-	/**
-	 * @return priority queue reference
-	 */
-	reference_wrapper<priorityQueueType> getPriorityQueue();
+	void setTitle(string title);
+	void setLinkOutNum(unsigned int linkOutNum);
+	void setLinkInNum(unsigned int linkInNum);
+	string getTitle();
+	unsigned int getLinkOutNum();
+	unsigned int getLinkInNum();
+	void addLinkOut(string title);
+	vector<shared_ptr<string>> getLinkOutList();
 };
 
 /**
- @class CharacterPriorityQueueTree
- Tables to convert character codes to binary strings and back \n
+ * @class DocumentDatabase
  */
-class CharacterPriorityQueueTree {
+class DocumentDatabase {
 private:
-	shared_ptr<CharacterPriorityQueueTreeNode> characterPriorityQueueTreePtr;
-	/** unordered_map<unsigned int, string> */
-	shared_ptr<unordered_map<unsigned int, string>> characterToBinaryTablePtr;
+	vector<shared_ptr<vector<bool>>> adjacencyMatrix;
+	vector<shared_ptr<HTMLDocument>> documentList;
 public:
-	CharacterPriorityQueueTree() {
-
-	}
-	~CharacterPriorityQueueTree() {
-
-	}
-	/**
-	 * build tree will edit the priority queue so we must pass by value
-	 * to prevent tampering
-	 * @param priority queue copy
-	 * @return true on build success, false on build failure
-	 */
-	bool buildTree(priorityQueueType priorityQueue);
-	bool buildBinaryTable();
-	void buildBinaryTableEncode(shared_ptr<CharacterPriorityQueueTreeNode> node,
-			string binaryString);
-	shared_ptr<unordered_map<unsigned int, string>> getCharacterToBinaryTable();
+	void addDocument(shared_ptr<HTMLDocument> document);
+	void createGraph();
+	void calculatePageRank();
+	string getAllPageRank();
 };
 
 /**
- @class CharacterToBinaryTable
- Tables to convert character codes to binary strings and back \n
+ * @class DocumentExtractor
+ * Assists in extracting relevant information
  */
-class CharacterToBinaryTable {
-private:
-	/** unordered_map<character code, character binary string> */
-	shared_ptr<unordered_map<unsigned int, string>> characterCodeToBinaryStringTablePtr;
-	/** unordered_map<character binary string, character code> */
-	shared_ptr<unordered_map<string, unsigned int>> binaryStringToCharacterCodeTablePtr;
-	CharacterPriorityQueueTreeNode characterPriorityQueueTreeNodeParent;
+class DocumentExtractor {
 public:
-	CharacterToBinaryTable() {
-
-	}
-	/**
-	 * to keep this class "slim", we will build our table elsewhere and move the pointer
-	 * ownership into this class.
-	 */
-	void set(shared_ptr<unordered_map<unsigned int, string>> tablePtr);
-	void set(shared_ptr<unordered_map<string, unsigned int>> tablePtr);
-	/**
-	 * build the binaryStringToCharacterCodeTable from the characterCodeToBinaryStringTable
-	 */
-	void buildBinaryStringToCharacterCodeTable();
-	/**
-	 * build the characterCodeToBinaryStringTable from the binaryStringToCharacterCodeTable
-	 */
-	void buildCharacterCodeToBinaryStringTable();
-	/**
-	 * Primary encoding method
-	 * @param characterCode Character character code
-	 * @return Character Binary String
-	 */
-	bool characterCodeToBinaryString(unsigned int characterCode,
-			string& binaryString);
-	/**
-	 * Primary decoding method
-	 * @param characterBinaryString Character Binary String
-	 * @return character code
-	 */
-	bool binaryStringToCharacterCode(string binaryString,
-			unsigned int& characterCode);
-};
-
-class Compressor: public StreamScanner {
-private:
-	shared_ptr<CharacterToBinaryTable> characterToBinaryTablePtr;
-	string streamBufferOut;
-public:
-	Compressor() {
-
-	}
-	~Compressor() {
-
-	}
-	void set(shared_ptr<CharacterToBinaryTable> tablePtr);
-	bool stream(istream& streamIn, ostream& streamOut);
-	bool bufferHandle(string& streamBuffer, bool final, va_list& args);
-	bool bufferOutHandle(string& streamBufferOut, bool final,
-			ostream& streamOut);
-};
-
-class Extractor: public StreamScanner {
-private:
-	shared_ptr<CharacterToBinaryTable> characterToBinaryTablePtr;
-	shared_ptr<FileData> fileDataPtr;
-	string binaryString, streamBufferOut;
-	unsigned int fileSizeCurrent, fileSizeTarget;
-public:
-	Extractor() :
-			fileSizeCurrent(0), fileSizeTarget(0) {
-
-	}
-	~Extractor() {
-
-	}
-	void set(shared_ptr<CharacterToBinaryTable> tablePtr);
-	void set(shared_ptr<FileData> fileDataPtr_);
-	bool stream(istream& streamIn, ostream& streamOut);
-	bool bufferHandle(string& streamBuffer, bool final, va_list& args);
-	bool bufferBinaryHandle(bool final, ostream& streamOut);
-	bool bufferOutHandle(bool final, ostream& streamOut);
+	void extract(XMLNode& XML_Document, DocumentDatabase& documentDatabase);
 };
 
 /*
  * FileHandler Implementation
  */
-bool FileHandler::readStream(string fileName, ifstream& fileStream) {
+void FileHandler::readStream(string fileName, ifstream& fileStream)
+		throw (unsigned int) {
 	fileStream.open(fileName, ios::binary);
-	if (fileStream.is_open()) {
-		return true;
+	if (!fileStream.is_open()) {
+		throw 1;
 	}
-	throw 1;
-	return false;
 }
 
-bool FileHandler::writeStream(string fileName, ofstream& fileStream) {
+void FileHandler::writeStream(string fileName, ofstream& fileStream)
+		throw (unsigned int) {
 	fileStream.open(fileName, ios::binary);
-	if (fileStream.is_open()) {
-		return true;
+	if (!fileStream.is_open()) {
+		throw 2;
 	}
-	throw 2;
-	return false;
 }
 
-bool FileHandler::writeString(string fileName, string stringValue) {
+void FileHandler::writeString(string fileName, string stringValue)
+		throw (unsigned int) {
 	ofstream fileStream;
 	fileStream.open(fileName);
 	if (fileStream.is_open()) {
 		fileStream << stringValue;
 		fileStream.close();
-		return true;
+	} else {
+		throw 1;
 	}
-	return false;
 }
 
-bool FileHandler::close(ifstream& fileStream) {
+void FileHandler::close(ifstream& fileStream) throw (unsigned int) {
 	try {
 		fileStream.close();
 	} catch (...) {
 		throw 7;
-		return false;
 	}
-	return true;
 }
 
-bool FileHandler::close(ofstream& fileStream) {
+void FileHandler::close(ofstream& fileStream) throw (unsigned int) {
 	try {
 		fileStream.close();
 	} catch (...) {
 		throw 8;
-		return false;
 	}
-	return true;
 }
 
 /*
- * CharacterFrequencyNode Implementation
+ * StreamScanner Implementation
  */
-CharacterFrequencyNode::CharacterFrequencyNode(unsigned int frequency_,
-		unsigned int characterCode_) {
-	frequency = frequency_;
-	characterCode = characterCode_;
-}
-
-/*
- * CharacterPriorityQueueTreeNode Implementation
- */
-unsigned int CharacterPriorityQueueTreeNode::getFrequency() {
-	return frequency;
-}
-/*
- * CharacterPriorityQueueTreeLeaf Implementation
- */
-bool CharacterPriorityQueueTreeLeaf::isLeaf() {
-	return true;
-}
-bool CharacterPriorityQueueTreeLeaf::isBranch() {
-	return false;
-}
-shared_ptr<CharacterFrequencyNode> CharacterPriorityQueueTreeLeaf::getCharacterNode() {
-	return characterFrequencyNode;
-}
-
-/*
- * CharacterPriorityQueueTreeBranch Implementation
- */
-bool CharacterPriorityQueueTreeBranch::isLeaf() {
-	return false;
-}
-bool CharacterPriorityQueueTreeBranch::isBranch() {
-	return true;
-}
-shared_ptr<CharacterPriorityQueueTreeNode> CharacterPriorityQueueTreeBranch::getLeft() {
-	return left;
-}
-shared_ptr<CharacterPriorityQueueTreeNode> CharacterPriorityQueueTreeBranch::getRight() {
-	return right;
-}
-/*
- * CharacterPriorityQueue Implementation
- */
-bool StreamScanner::scanStream(istream& streamIn, ...) {
+bool StreamScanner::scanStream(istream& streamIn,
+		std::function<void(string&, bool)> bufferHandleCallback) {
 	unsigned int fileSize, filePos, bufferSize, mode;
 	string streamBuffer;
-	stack<string> documentStack;
 	bufferSize = STREAM_SCANNER_BUFFER_SIZE;
 	fileSize = filePos = mode = 0;
 	streamBuffer = "";
@@ -464,481 +225,294 @@ bool StreamScanner::scanStream(istream& streamIn, ...) {
 		memset(bufferInChar, 0, sizeof(bufferInChar)); // zero out buffer
 		streamIn.read(bufferInChar, bufferSize);
 		streamBuffer.append(bufferInChar, bufferSize);
-		va_list args;
-		va_start(args, &streamIn);
-		bufferHandle(streamBuffer, false, args);
-		va_end(args);
+		bufferHandleCallback(streamBuffer, false);
 		// advance buffer
 		filePos += bufferSize;
 	}
 	// handle the remaining buffer
-	va_list args;
-	va_start(args, &streamIn);
-	bufferHandle(streamBuffer, true, args);
-	va_end(args);
+	bufferHandleCallback(streamBuffer, true);
 	return true;
 }
+
 /*
- * FileData Implementation
+ * XMLNode Implementation
  */
-bool FileData::stream(istream& streamIn) {
-	streamIn.seekg(0, ios::end); // set the pointer to the end
-	fileSize = static_cast<unsigned int>(streamIn.tellg()); // get the length of the file
-	streamIn.seekg(0, ios::beg); // set the pointer to the beginning
-	return true;
+bool XMLNode::parseStream(ifstream& streamIn) {
+	return parseStream(static_cast<istream&>(streamIn));
 }
-unsigned int FileData::getFileSize() {
-	return fileSize;
-}
-/*
- * CharacterPriorityQueue Implementation
- */
-bool CharacterPriorityQueue::stream(istream& streamIn) {
-	/* Parsing Steps:
-	 * 1. read in buffer
-	 * 2. go through each character in buffer
-	 *    add the character code as hash table key and value as the frequency
+bool XMLNode::parseStream(istream& streamIn) {
+	unsigned int mode = 0;
+	stack<shared_ptr<XMLNode>> documentStack;
+	/* 2018-06-04 Revision 2
+	 * bottom of the stack is the document node.
 	 * */
-	return scanStream(streamIn);
+	documentStack.push(shared_from_this());
+	return StreamScanner::scanStream(streamIn,
+			[this, &mode, &documentStack](string& streamBuffer, bool final) {
+				streamBufferHandle(streamBuffer, final, documentStack, mode);
+			});
 }
-
-bool CharacterPriorityQueue::bufferHandle(string& streamBuffer, bool final,
-		va_list& args) {
-	/* characters are placed into a hash table
-	 * unordered_map[CharacterCode] = CharacterFrequency
-	 */
-	size_t i, n;
-	n = streamBuffer.size();
-	unsigned int characterCode;
-	shared_ptr<unsigned int> characterFrequencyPtr;
-	for (i = 0; i < n; i++) {
-		characterCode =
-				static_cast<unsigned int>(static_cast<int>(streamBuffer[i]));
-		try {
-			characterFrequencyPtr = characterFrequencyTable.at(characterCode);
-			// character exists. increment frequency
-			(*characterFrequencyPtr)++;
-		} catch (...) {
-			characterFrequencyTable.insert(
-					{ characterCode, make_shared<unsigned int>(1) });
-		}
-	}
-	streamBuffer = "";
-	// there actually is no point to the return, but maybe there will be in the future
-	return true;
-}
-
-bool CharacterPriorityQueue::buildPriorityQueue() {
-	for (const auto& pair : characterFrequencyTable) {
-		priorityQueue.push(
-				dynamic_pointer_cast<CharacterPriorityQueueTreeNode>(
-						make_shared<CharacterPriorityQueueTreeLeaf>(
-								make_shared<CharacterFrequencyNode>(
-										*(pair.second), pair.first))));
-	}
-	return true;
-}
-
-reference_wrapper<priorityQueueType> CharacterPriorityQueue::getPriorityQueue() {
-	return ref(priorityQueue);
-}
-
-/*
- * CharacterPriorityQueueTree Implementation
- */
-bool CharacterPriorityQueueTree::buildTree(priorityQueueType priorityQueue) {
-	if (priorityQueue.size() > 0) {
-		shared_ptr<CharacterPriorityQueueTreeNode> left;
-		shared_ptr<CharacterPriorityQueueTreeNode> right;
-		shared_ptr<CharacterPriorityQueueTreeNode> branch;
-		while (priorityQueue.size() > 1) {
-			left = priorityQueue.top();
-			priorityQueue.pop();
-			right = priorityQueue.top();
-			priorityQueue.pop();
-			branch = dynamic_pointer_cast<CharacterPriorityQueueTreeNode>(
-					make_shared<CharacterPriorityQueueTreeBranch>(left, right));
-			priorityQueue.push(branch);
-		}
-		characterPriorityQueueTreePtr = priorityQueue.top();
-	}
-	return true;
-}
-bool CharacterPriorityQueueTree::buildBinaryTable() {
-	if (!characterToBinaryTablePtr) {
-		characterToBinaryTablePtr = make_shared<
-				unordered_map<unsigned int, string>>(255);
-	}
-	if (characterPriorityQueueTreePtr) {
-		buildBinaryTableEncode(characterPriorityQueueTreePtr, "");
-	}
-	return true;
-}
-void CharacterPriorityQueueTree::buildBinaryTableEncode(
-		shared_ptr<CharacterPriorityQueueTreeNode> node, string binaryString) {
-	if (node->isBranch()) {
-		if (dynamic_pointer_cast<CharacterPriorityQueueTreeBranch>(node)) {
-			// copy each side before appending. append will modify original.
-			string binaryStringLeft = binaryString;
-			string binaryStringRight = binaryString;
-			buildBinaryTableEncode(
-					dynamic_pointer_cast<CharacterPriorityQueueTreeBranch>(node)->getLeft(),
-					binaryStringLeft.append("0"));
-			buildBinaryTableEncode(
-					dynamic_pointer_cast<CharacterPriorityQueueTreeBranch>(node)->getRight(),
-					binaryStringRight.append("1"));
-		}
-	} else {
-		if (dynamic_pointer_cast<CharacterPriorityQueueTreeLeaf>(node)) {
-			characterToBinaryTablePtr->insert(
-					{
-							dynamic_pointer_cast<CharacterPriorityQueueTreeLeaf>(
-									node)->getCharacterNode()->characterCode,
-							binaryString });
-		}
-	}
-}
-shared_ptr<unordered_map<unsigned int, string>> CharacterPriorityQueueTree::getCharacterToBinaryTable() {
-	return characterToBinaryTablePtr;
-}
-
-/*
- * CharacterToBinaryTable Implementation
- */
-void CharacterToBinaryTable::set(
-		shared_ptr<unordered_map<unsigned int, string>> tablePtr) {
-	characterCodeToBinaryStringTablePtr = tablePtr;
-}
-
-void CharacterToBinaryTable::set(
-		shared_ptr<unordered_map<string, unsigned int>> tablePtr) {
-	binaryStringToCharacterCodeTablePtr = tablePtr;
-}
-
-void CharacterToBinaryTable::buildBinaryStringToCharacterCodeTable() {
-	/*
-	 * builds unordered_map<binary string, character code>
-	 */
-	if (!binaryStringToCharacterCodeTablePtr) {
-		// we only expect around 255 unique characters
-		binaryStringToCharacterCodeTablePtr = make_shared<
-				unordered_map<string, unsigned int>>(255);
-	}
-	for (const auto& pair : *characterCodeToBinaryStringTablePtr) {
-		binaryStringToCharacterCodeTablePtr->insert(
-				{ pair.second, pair.first });
-	}
-}
-
-void CharacterToBinaryTable::buildCharacterCodeToBinaryStringTable() {
-	/*
-	 * builds unordered_map<character code, binary string>
-	 */
-	if (!characterCodeToBinaryStringTablePtr) {
-		// we only expect around 255 unique characters
-		characterCodeToBinaryStringTablePtr = make_shared<
-				unordered_map<unsigned int, string>>(255);
-	}
-	for (const auto& pair : *binaryStringToCharacterCodeTablePtr) {
-		characterCodeToBinaryStringTablePtr->insert(
-				{ pair.second, pair.first });
-	}
-}
-
-bool CharacterToBinaryTable::characterCodeToBinaryString(
-		unsigned int characterCode, string& binaryString) {
-	bool returnValue = false;
-	try {
-		binaryString = characterCodeToBinaryStringTablePtr->at(characterCode);
-		returnValue = true;
-	} catch (...) {
-		// nothing
-	}
-	return returnValue;
-}
-bool CharacterToBinaryTable::binaryStringToCharacterCode(string binaryString,
-		unsigned int& characterCode) {
-	bool returnValue = false;
-	try {
-		characterCode = binaryStringToCharacterCodeTablePtr->at(binaryString);
-		returnValue = true;
-	} catch (...) {
-		// nothing
-	}
-	return returnValue;
-}
-
-/*
- * Compressor Implementation
- */
-void Compressor::set(shared_ptr<CharacterToBinaryTable> tablePtr) {
-	characterToBinaryTablePtr = tablePtr;
-}
-
-bool Compressor::stream(istream& streamIn, ostream& streamOut) {
-	/* Parsing Steps:
-	 * 1. read in buffer
-	 * 2. go through each character in buffer
-	 *    add the character code as hash table key and value as the frequency
-	 * */
-	return scanStream(streamIn, &streamOut);
-}
-bool Compressor::bufferHandle(string& streamBuffer, bool final, va_list& args) {
-	/* characters are placed into a hash table
-	 * unordered_map[CharacterCode] = CharacterFrequency
-	 */
-	ostream& streamOut = va_arg(args, ostream);
-	size_t i, n;
-	n = streamBuffer.size();
-	unsigned int characterCode;
-	string binaryString;
-	for (i = 0; i < n; i++) {
-		characterCode =
-				static_cast<unsigned int>(static_cast<int>(streamBuffer[i]));
-		if (characterToBinaryTablePtr->characterCodeToBinaryString(
-				characterCode, binaryString)) {
-			streamBufferOut.append(binaryString);
-			if (streamBufferOut.size() >= STREAM_SCANNER_BUFFER_SIZE) {
-				bufferOutHandle(streamBufferOut, false, streamOut);
+bool XMLNode::streamBufferHandle(string& streamBuffer, bool final,
+		stack<shared_ptr<XMLNode>>& documentStack, unsigned int& mode) {
+	size_t tagOpenPos, tagEndPos;
+	string tagPop, matchGroupString, temp;
+	while (true) {
+		if (mode == 0) {
+			// Expecting opening angle bracket for a tag
+			tagOpenPos = (unsigned int) streamBuffer.find("<");
+			if (tagOpenPos != string::npos) {
+				/* opening angle bracket for a tag
+				 * we assume that text before this is the value of current xml node
+				 */
+				mode = 1;
+				documentStack.top()->valueAppend(
+						streamBuffer.substr(0, tagOpenPos));
+				streamBuffer.erase(0, tagOpenPos);
+				tagOpenPos = 0;
+			} else {
+				break;
+			}
+		} else if (mode == 1) {
+			// expecting ending angle bracket for a tag
+			tagEndPos = (unsigned int) streamBuffer.find(">");
+			temp = streamBuffer.substr(0, tagEndPos + 1);
+			std::smatch m;
+			if (tagEndPos != string::npos) {
+				// let's use regex to grab the tag name between the angled brackets
+				// let's first check if we just ended an ending tag </>
+				//std::smatch m;
+				regex_match(temp, m, tagEndRegex);
+				if (!m.empty()) {
+					/* extract matched group
+					 * a .trim() method would be great...
+					 */
+					try {
+						matchGroupString = m[1].str(); // match group
+					} catch (...) {
+						matchGroupString = "";
+					}
+					/*string s;
+					 s.append("</").append(matchGroupString).append(">\n");
+					 cout << s;*/
+					documentStack.top()->nodePop(matchGroupString,
+							documentStack);
+				} else {
+					// now check if we just ended an opening tag <>
+					//std::smatch m;
+					regex_match(temp, m, tagOpenRegex);
+					if (!m.empty()) {
+						try {
+							matchGroupString = m[1].str(); // match group
+						} catch (...) {
+							matchGroupString = "";
+						}
+						/*string s;
+						 s.append("<").append(matchGroupString).append(">\n");
+						 cout << s;*/
+						documentStack.top()->nodePush(matchGroupString,
+								documentStack);
+					}
+				}
+				// erase to the end of the ending angle bracket ">"
+				streamBuffer.erase(0, tagEndPos + 1);
+				mode = 0;
+			} else {
+				break;
 			}
 		}
 	}
-	streamBuffer.clear();
 	if (final) {
-		bufferOutHandle(streamBufferOut, true, streamOut);
+		documentStack.top()->valueAppend(streamBuffer);
 	}
 	return true;
 }
 
-bool Compressor::bufferOutHandle(string& streamBufferOut, bool final,
-		ostream& streamOut) {
-	size_t i, n, r;
-	if (final) {
-		r = streamBufferOut.size() % 8;
-		// fill end with zeros to be divisible by 8
-		streamBufferOut.append(8 - r, '1');
+bool XMLNode::nodePop(string& tagString,
+		stack<shared_ptr<XMLNode>>& documentStack) {
+	/* pop nodes off stack until end tag is found
+	 * can't go lower than the document root
+	 */
+	string tagPop = "";
+	if (tagString.length() > 0) {
+		/* 2018-06-04 Revision 2
+		 * bottom of the stack is the document node. These reduces number of arguments passed.
+		 * */
+		while (documentStack.size() > 1 && tagPop != tagString) {
+			tagPop = documentStack.top()->getName();
+			documentStack.pop();
+			/* 2018-06-04 Revision 2
+			 * XMLNode.getParent() was removed because it could lead to circular references
+			 * */
+		}
 	}
-	n = streamBufferOut.size() / 8;
-	char bufferOutChar[STREAM_SCANNER_BUFFER_SIZE];
-	memset(bufferOutChar, 0, sizeof(bufferOutChar)); // zero out buffer
-	for (i = 0; i < n; i++) {
-		std::bitset<8> b(streamBufferOut.substr(i * 8, 8));
-		bufferOutChar[i] = b.to_ulong();
-	}
-	streamBufferOut.erase(0, n * 8);
-	streamOut.write(const_cast<const char*>(bufferOutChar), n);
 	return true;
+}
+
+bool XMLNode::nodePush(string& tagString,
+		stack<shared_ptr<XMLNode>>& documentStack) {
+	if (tagString.length() > 0) {
+		documentStack.push(documentStack.top()->addChild(tagString));
+	}
+	return true;
+}
+void XMLNode::valueAppend(string str) {
+	value_.append(str);
+}
+string XMLNode::getName() {
+	return name_;
+}
+string XMLNode::getValue() {
+	return value_;
+}
+shared_ptr<XMLNode> XMLNode::addChild(string str) {
+	shared_ptr<XMLNode> childNode = make_shared<XMLNode>(str);
+	//cout << "child " << str << " name: "<<name << endl;
+	childNodes.push_back(childNode);
+	return childNode;
+}
+shared_ptr<XMLNode> XMLNode::getChild(unsigned int index) {
+	shared_ptr<XMLNode> nodeReturn;
+	try {
+		nodeReturn = childNodes.at(index);
+	} catch (...) {
+		// nothing
+	}
+	return nodeReturn;
+}
+bool XMLNode::findChild(string name, shared_ptr<XMLNode>& returnNode,
+		unsigned int index) {
+	unsigned int findCount, i, n;
+	bool returnValue = false;
+	findCount = 0;
+	n = static_cast<unsigned int>(childNodes.size());
+	for (i = 0; i < n; i++) {
+		if (childNodes[i]->name_ == name) {
+			if (findCount == index) {
+				returnNode = childNodes[i];
+				returnValue = true;
+				break;
+			}
+			findCount++;
+		}
+	}
+	return returnValue;
+}
+unsigned int XMLNode::childrenSize() {
+	return static_cast<unsigned int>(childNodes.size());
+}
+unsigned int XMLNode::findChildSize(string name) {
+	unsigned int findCount, i, n;
+	findCount = 0;
+	n = static_cast<unsigned int>(childNodes.size());
+	for (i = 0; i < n; i++) {
+		if (childNodes[i]->name_ == name) {
+			findCount++;
+		}
+	}
+	return findCount;
 }
 
 /*
- * Extractor Implementation
+ * HTMLDocument Implementation
  */
-void Extractor::set(shared_ptr<CharacterToBinaryTable> tablePtr) {
-	characterToBinaryTablePtr = tablePtr;
+
+/*
+ * DocumentDatabase Implementation
+ */
+void DocumentDatabase::createGraph() {
+
 }
 
-void Extractor::set(shared_ptr<FileData> fileDataPtr_) {
-	fileDataPtr = fileDataPtr_;
+void DocumentDatabase::calculatePageRank() {
+
 }
 
-bool Extractor::stream(istream& streamIn, ostream& streamOut) {
-	fileSizeCurrent = 0;
-	fileSizeTarget = fileDataPtr->getFileSize();
-	return scanStream(streamIn, &streamOut);
-}
-bool Extractor::bufferHandle(string& streamBuffer, bool final, va_list& args) {
-	/* characters are placed into a hash table
-	 * unordered_map[CharacterCode] = CharacterFrequency
-	 */
-	ostream& streamOut = va_arg(args, ostream);
-	size_t i, j, nTotal, nBatches, nBatch, nLimit;
-	nTotal = streamBuffer.size();
-	nBatch = STREAM_SCANNER_BUFFER_SIZE / 8;
-	nBatches = (nTotal / nBatch) + 1;
-	for (i = 0; i < nBatches; i++) {
-		nLimit = (i + 1) * nBatch;
-		if (nLimit > nTotal) {
-			nLimit = nTotal;
-		}
-		for (j = i * nBatch; j < nLimit; j++) {
-			std::bitset<8> b(streamBuffer[j]);
-			binaryString.append(b.to_string());
-		}
-		bufferBinaryHandle(false, streamOut);
-	}
-	streamBuffer.clear();
-	if (final) {
-		bufferBinaryHandle(true, streamOut);
-		bufferOutHandle(true, streamOut);
-		if (fileSizeCurrent != fileSizeTarget) {
-			// original file size does not match the current
-			throw 8;
-		}
-	}
-	return true;
+string DocumentDatabase::getAllPageRank() {
+	return "";
 }
 
-bool Extractor::bufferBinaryHandle(bool final, ostream& streamOut) {
-	size_t i, n, last;
-	unsigned int characterCode = 0;
-	i = 1;
-	last = 0;
-	n = binaryString.size();
-	while (i <= n && fileSizeCurrent < fileSizeTarget) {
-		if (characterToBinaryTablePtr->binaryStringToCharacterCode(
-				binaryString.substr(last, i), characterCode)) {
-			char c[1];
-			c[0] = static_cast<char>(characterCode);
-			streamBufferOut.append(c, 1);
-			last = last + i;
-			n = n - i;
-			i = 1;
-			if (streamBufferOut.size() >= STREAM_SCANNER_BUFFER_SIZE) {
-				bufferOutHandle(false, streamOut);
-			}
-			fileSizeCurrent++;
-		} else {
-			i++;
-		}
-	}
-	if (last > 0) {
-		binaryString.erase(0, last);
-	}
-	// we don't need to handle the leftover bits. they were only padding
-	return true;
-}
+/*
+ * DocumentExtractor Implementation
+ */
+void DocumentExtractor::extract(XMLNode& XML_Document,
+		DocumentDatabase& documentDatabase) {
 
-bool Extractor::bufferOutHandle(bool final, ostream& streamOut) {
-	size_t nBuf = streamBufferOut.size();
-	if (nBuf > STREAM_SCANNER_BUFFER_SIZE) {
-		nBuf = STREAM_SCANNER_BUFFER_SIZE;
-	}
-	if (nBuf > 0) {
-		streamOut.write(
-				const_cast<const char*>(streamBufferOut.substr(0, nBuf).c_str()),
-				nBuf);
-		streamBufferOut.erase(0, nBuf);
-	}
-	// we don't need to handle the leftover bits. they were only padding
-	return true;
 }
 
 /*
  * main & interface
- * Rules For Encoding:
- * - Read through file and increment character code frequency in a hash table based on contents
+ * Rules for calculating page rank:
+ * - parse the poorly formed "HTML" document
  * - Generate frequency table with priority queue
  * - Create binary tree from priority queue
  * - Encrypt the input file as an encrypted binary file
- *
- * Rules For Decoding
- * - Decrypt the encrypted binary file using the existing priority queue
- *
  */
 int main() {
 	FileHandler fh;
-	CharacterPriorityQueue characterPriorityQueue;
-	CharacterPriorityQueueTree characterPriorityQueueTree;
-	shared_ptr<CharacterToBinaryTable> characterToBinaryTablePtr = make_shared<
-			CharacterToBinaryTable>();
-	shared_ptr<FileData> filedataPtr = make_shared<FileData>();
-	Compressor compressor;
-	Extractor extractor;
-	string fileNameOriginal, fileNameEncrypt, fileNameDecrypt;
+	XMLNode document;
+	DocumentExtractor documentExtractor;
+	DocumentDatabase documentDatabase;
+	string fileNameHTML;
 	ifstream fileStreamIn;
-	ofstream fileStreamOut;
 	/* input/output files are here */
-	fileNameOriginal = "Speech.txt";
-	fileNameEncrypt = "encrypt.data";
-	fileNameDecrypt = "decrypt.txt";
-	cout << "Opening the input file." << endl;
+	fileNameHTML = "PageRank.html";
+	cout << "Opening the input file.\n";
 	try {
-		fh.readStream(fileNameOriginal, fileStreamIn);
-		fh.writeStream(fileNameEncrypt, fileStreamOut);
-		cout << "Parsing input input stream as a character frequency table."
-				<< endl;
+		fh.readStream(fileNameHTML, fileStreamIn);
+		cout << "Parsing the HTML file. \"" << fileNameHTML << "\"\n";
 		/* we pass a file stream instead of a reading the whole file
 		 * into memory to reduce memory usage.
 		 */
-		characterPriorityQueue.stream(fileStreamIn);
-		// get file data
-		filedataPtr->stream(fileStreamIn);
-		cout << "Building the priority queue." << endl;
-		characterPriorityQueue.buildPriorityQueue();
-		cout << "Building the priority queue tree." << endl;
-		characterPriorityQueueTree.buildTree(
-				characterPriorityQueue.getPriorityQueue());
-		cout << "Building the binary string table." << endl;
-		characterPriorityQueueTree.buildBinaryTable();
-		cout << "Compressing the input file." << endl;
-		characterToBinaryTablePtr->set(
-				characterPriorityQueueTree.getCharacterToBinaryTable());
-		compressor.set(characterToBinaryTablePtr);
-		compressor.stream(fileStreamIn, fileStreamOut);
-		/* encoding successful, now let's clean up */
-		cout << "Closing input and output files." << endl;
+		document.parseStream(fileStreamIn);
+		cout << "Closing input file.\n";
 		fh.close(fileStreamIn);
-		fh.close(fileStreamOut);
-		cout << "The file \"" << fileNameOriginal
-				<< "\" was successfully compressed as \"" << fileNameEncrypt
-				<< "\"" << endl;
-		cout << "Opening the input file." << endl;
-		fh.readStream(fileNameEncrypt, fileStreamIn);
-		fh.writeStream(fileNameDecrypt, fileStreamOut);
-		cout << "Extracting the input file." << endl;
-		// only need for decoding
-		characterToBinaryTablePtr->buildBinaryStringToCharacterCodeTable();
-		extractor.set(characterToBinaryTablePtr);
-		extractor.set(filedataPtr);
-		extractor.stream(fileStreamIn, fileStreamOut);
-		cout << "Closing input and output files." << endl;
-		fh.close(fileStreamIn);
-		fh.close(fileStreamOut);
-		cout << "The file \"" << fileNameEncrypt
-				<< "\" was successfully extracted as \"" << fileNameDecrypt
-				<< "\"" << endl;
+		cout << "Extracting relevant XML data to the document database.\n";
+		documentExtractor.extract(document, documentDatabase);
+		/* The Document Extractor takes an XML document and extracts
+		 * the lab specific information into a document database
+		 */
+		cout << "Creating graph from documents.\n";
+		documentDatabase.createGraph();
+		cout << "Calculating Page Ranks.\n";
+		documentDatabase.calculatePageRank();
+		cout << "Page rank:\n";
+		cout << documentDatabase.getAllPageRank() << "\n";
 	} catch (int& exceptionCode) {
 		switch (exceptionCode) {
 		case 1:
-			cout << "[Error] Could not open the input file \""
-					<< fileNameOriginal << "\"" << endl;
+			cout << "[Error] Could not open the input file \"" << fileStreamIn
+					<< "\"\n";
 			break;
 		case 2:
-			cout << "[Error] Could not open the output file \""
-					<< fileNameEncrypt << "\"" << endl;
+			cout << "[Error] Could not open the output file\n";
 			break;
 		case 3:
 			cout
-					<< "[Error] Could not parse the input stream as a character frequency table."
-					<< endl;
+					<< "[Error] Could not parse the input stream as a character frequency table.\m";
 			break;
 		case 4:
-			cout << "[Error] Could not build the priority queue." << endl;
+			cout << "[Error] Could not build the priority queue.\n";
 			break;
 		case 5:
-			cout << "[Error] Could not build the priority queue tree." << endl;
+			cout << "[Error] Could not build the priority queue tree.\n";
 			break;
 		case 6:
-			cout << "[Error] Could not build the binary string table." << endl;
+			cout << "[Error] Could not build the binary string table.\n";
 			break;
 		case 7:
-			cout << "[Error] Could not compress the file." << endl;
+			cout << "[Error] Could not compress the file.\n";
 			break;
 		case 8:
-			cout << "[Error] Could not extract the file." << endl;
+			cout << "[Error] Could not extract the file.\n";
 			break;
 		case 9:
-			cout << "[Error] Could not close the input file \""
-					<< fileNameOriginal << "\"" << endl;
-			break;
-		case 10:
-			cout << "[Error] Could not close the output file \""
-					<< fileNameEncrypt << "\"" << endl;
+			cout << "[Error] Could not close the input file \"" << fileStreamIn
+					<< "\"\n";
 			break;
 		}
 	}
 
-	cout << "Enter any key to exit..." << endl;
+	cout << "Enter any key to exit...\n";
 	string temp;
 	getline(cin, temp);
 	return 0;
