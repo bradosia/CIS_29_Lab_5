@@ -1,11 +1,15 @@
 //============================================================================
 // Name        : Lab5
 // Author      : Branden Lee
-// Date        : 5/30/2018
-// Description : Encryption and Compression
+// Date        : 6/29/2018
+// Description : Graphs
 //============================================================================
 
 /**
+ * IMPORTANT NOTE: THIS PROJECT USES C++17
+ * In Microsoft Visual Studio 2017 set C++17 by navigating to:
+ * project -> properties -> C++ -> language
+ *
  * Project Assessment:
  * In a preliminary overview of the project and the input file, I determined
  * that the amalgamated HTML document "PageRank.html" is not valid HTML and is missing many closing tags.
@@ -26,6 +30,10 @@
 #include <regex>			// std::regex_match
 #include <functional>		// std::function
 #include <string_view>		// std::string_view
+#include <algorithm>    	// std::find
+#include <locale>			// std::locale, std::tolower
+#include <sstream>			// std::stringstream
+#include <cmath>			// std::abs
 using namespace std;
 
 /** Buffer size for reading in files for parsing */
@@ -48,12 +56,13 @@ public:
 	 @post None
 	 @param string File name to open
 	 @return True on file open successful and false in not
+	 @throw unsigned int 1 error code
 	 */
-	void readStream(string fileName, ifstream& fileStream) throw (unsigned int);
-	void writeStream(string fileName, ofstream& fileStream) throw (unsigned int);
-	void writeString(string fileName, string stringValue) throw (unsigned int);
-	void close(ifstream& fileStream) throw (unsigned int);
-	void close(ofstream& fileStream) throw (unsigned int);
+	void readStream(string fileName, ifstream& fileStream);
+	void writeStream(string fileName, ofstream& fileStream);
+	void writeString(string fileName, string stringValue);
+	void close(ifstream& fileStream);
+	void close(ofstream& fileStream);
 };
 
 /**
@@ -67,116 +76,198 @@ public:
 };
 
 /**
- @class XMLNode
- XML document node \n
+ * @class HTMLNode
+ * HTML document node \n
+ * HTML is not easy to parse. There are many if/else statements to catch different cases
+ * for html nodes. some html nodes don't have ending tags, so they must watched for. \n
+ * This node class will also be used for the document node and DOM search results.
  */
-class XMLNode: public std::enable_shared_from_this<XMLNode> {
+class HTMLNode {
+public:
+	using item_t = shared_ptr<HTMLNode>;
+	using container_t = vector<item_t>;
 private:
 	string name_; // tag name inside the angled brackets <name>
+	string attributes_; // <name attribute="attributeValue">
 	string value_; // non-child-node inside node <>value</>
-	vector<shared_ptr<XMLNode>> childNodes;
+	container_t childNodes;
 	/* 2018-06-04 Revision 2
-	 * XMLNode.parentNode was removed because it could lead to circular references
+	 * HTMLNode.parentNode was removed because it could lead to circular references
 	 * */
 	regex tagOpenRegex, tagEndRegex;
 public:
-	XMLNode() :
+	HTMLNode() :
 			name_(""), value_(""), tagOpenRegex("\\<(.*?)\\>"), tagEndRegex(
 					"\\<\\/(.*?)\\>") {
 	}
-	XMLNode(string name) :
+	HTMLNode(string name) :
 			name_(name), value_(""), tagOpenRegex("\\<(.*?)\\>"), tagEndRegex(
 					"\\<\\/(.*?)\\>") {
 	}
-	~XMLNode() {
+	~HTMLNode() {
 
 	}
 	bool parseStream(ifstream& streamIn);
 	bool parseStream(istream& streamIn);
 	bool streamBufferHandle(string& streamBuffer, bool final,
-			stack<shared_ptr<XMLNode>>& documentStack, unsigned int& mode);
-	bool nodePop(string& tagString, stack<shared_ptr<XMLNode>>& documentStack);
-	bool nodePush(string& tagString, stack<shared_ptr<XMLNode>>& documentStack);
+			stack<item_t>& documentStack, unsigned int& mode);
+	bool nodePop(string tagString, stack<item_t>& documentStack);
+	bool nodePush(string tagString, stack<item_t>& documentStack);
+	void setAttributes(string str);
 	void valueAppend(string str);
 	/* not a comprehensive list of definitions for all getters/setters
 	 * it is not vital to the program to have all setters
 	 */
 	string getName();
+	string getAttributes();
 	string getValue();
 	/* 2018-06-04 Revision 2
-	 * XMLNode.getParent() was removed because it could lead to circular references
+	 * HTMLNode.getParent() was removed because it could lead to circular references
 	 * */
-	shared_ptr<XMLNode> addChild(string str);
-	shared_ptr<XMLNode> getChild(unsigned int index);
-	bool findChild(string name, shared_ptr<XMLNode>& returnNode,
-			unsigned int index);
-	unsigned int childrenSize();
-	unsigned int findChildSize(string name);
+	item_t addChild(string str);
+
+	item_t& at(unsigned long long int index) {
+		return childNodes.at(index);
+	}
+	void push_back(item_t item) {
+		childNodes.push_back(item);
+	}
+	container_t::iterator find(string& name) {
+		return find_if(childNodes.begin(), childNodes.end(),
+				[name](const shared_ptr<HTMLNode>& arg)->bool {
+					return arg->getName() == name;
+				});
+	}
+	void findName(HTMLNode& matches, string str);
+	void findAttribute(HTMLNode& matches, string str);
+	void findValue(HTMLNode& matches, string str);
+	string toString(string prefix = "");
+	size_t size() {
+		return childNodes.size();
+	}
+	container_t::iterator begin() {
+		return childNodes.begin();
+	}
+	container_t::iterator end() {
+		return childNodes.end();
+	}
+	bool operator==(const item_t& rhs) {
+		return getName() == rhs->getName();
+	}
+	bool operator==(const string& rhs) {
+		return getName() == rhs;
+	}
 };
 
 /**
  * @class HTMLDocument
+ * The HTML document used in page rank calculations
  */
 class HTMLDocument {
-private:
-	string title_;
-	unsigned int linkOutNum_, linkInNum_;
-	vector<shared_ptr<string>> linkOutList;
 public:
+	using container_t = vector<shared_ptr<HTMLDocument>>;
+private:
+	string title_, link_;
+	container_t documentOutList;
+public:
+	unsigned int linkOutNum, linkInNum;
+	double pageRank, pageRankLast, pageRankDifference;
+	HTMLDocument(string title) :
+			title_(title), linkOutNum(0), linkInNum(0), pageRank(1.0), pageRankLast(
+					1.0), pageRankDifference(0.0) {
+
+	}
 	void setTitle(string title);
-	void setLinkOutNum(unsigned int linkOutNum);
-	void setLinkInNum(unsigned int linkInNum);
+	void setLink(string str);
 	string getTitle();
-	unsigned int getLinkOutNum();
-	unsigned int getLinkInNum();
-	void addLinkOut(string title);
-	vector<shared_ptr<string>> getLinkOutList();
+	string getLink();
+	void addDocumentOut(shared_ptr<HTMLDocument> docPtr) {
+		documentOutList.push_back(docPtr);
+	}
+	size_t pageOutNum() {
+		return documentOutList.size();
+	}
+	container_t::iterator begin() {
+		return documentOutList.begin();
+	}
+	container_t::iterator end() {
+		return documentOutList.end();
+	}
+	string toString(string prefix = "", unsigned int depth = 1);
+	string calculationToString();
 };
 
 /**
  * @class DocumentDatabase
+ * This class contains the database of webpages we will use for page rank calculations. \n
+ * The table key is case insensitive.
  */
 class DocumentDatabase {
+public:
+	using item_t = shared_ptr<HTMLDocument>;
+	using container_t = unordered_map<string, item_t>;
 private:
 	vector<shared_ptr<vector<bool>>> adjacencyMatrix;
-	vector<shared_ptr<HTMLDocument>> documentList;
+	container_t documentTable;
+	std::locale loc;
+	unsigned int pageRankIterations;
 public:
-	void addDocument(shared_ptr<HTMLDocument> document);
+	double pageRankDifferenceTotal, dampingFactor;
+	DocumentDatabase() :
+			pageRankIterations(0), pageRankDifferenceTotal(0.0), dampingFactor(
+					0.85) {
+	}
+	void insert(string key, shared_ptr<HTMLDocument> item) {
+		std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+		documentTable.insert( { key, item });
+	}
 	void createGraph();
 	void calculatePageRank();
+	void calculatePageRankIteration(double d);
 	string getAllPageRank();
+	container_t::iterator find(string key) {
+		std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+		return documentTable.find(key);
+	}
+	container_t::iterator begin() {
+		return documentTable.begin();
+	}
+	container_t::iterator end() {
+		return documentTable.end();
+	}
+	string toString(string prefix = "", unsigned int depth = 1);
+	string calculationToString();
+	string graphToString();
 };
 
 /**
  * @class DocumentExtractor
- * Assists in extracting relevant information
+ * Assists in extracting relevant information from the HTML DOM to the
+ * document database
  */
 class DocumentExtractor {
 public:
-	void extract(XMLNode& XML_Document, DocumentDatabase& documentDatabase);
+	void extract(HTMLNode& XML_Document, DocumentDatabase& documentDatabase);
 };
 
 /*
  * FileHandler Implementation
  */
-void FileHandler::readStream(string fileName, ifstream& fileStream)
-		throw (unsigned int) {
+void FileHandler::readStream(string fileName, ifstream& fileStream) {
 	fileStream.open(fileName, ios::binary);
 	if (!fileStream.is_open()) {
 		throw 1;
 	}
 }
 
-void FileHandler::writeStream(string fileName, ofstream& fileStream)
-		throw (unsigned int) {
+void FileHandler::writeStream(string fileName, ofstream& fileStream) {
 	fileStream.open(fileName, ios::binary);
 	if (!fileStream.is_open()) {
 		throw 2;
 	}
 }
 
-void FileHandler::writeString(string fileName, string stringValue)
-		throw (unsigned int) {
+void FileHandler::writeString(string fileName, string stringValue) {
 	ofstream fileStream;
 	fileStream.open(fileName);
 	if (fileStream.is_open()) {
@@ -187,19 +278,19 @@ void FileHandler::writeString(string fileName, string stringValue)
 	}
 }
 
-void FileHandler::close(ifstream& fileStream) throw (unsigned int) {
+void FileHandler::close(ifstream& fileStream) {
 	try {
 		fileStream.close();
 	} catch (...) {
-		throw 7;
+		throw 3;
 	}
 }
 
-void FileHandler::close(ofstream& fileStream) throw (unsigned int) {
+void FileHandler::close(ofstream& fileStream) {
 	try {
 		fileStream.close();
 	} catch (...) {
-		throw 8;
+		throw 4;
 	}
 }
 
@@ -235,83 +326,122 @@ bool StreamScanner::scanStream(istream& streamIn,
 }
 
 /*
- * XMLNode Implementation
+ * HTMLNode Implementation
  */
-bool XMLNode::parseStream(ifstream& streamIn) {
+bool HTMLNode::parseStream(ifstream& streamIn) {
 	return parseStream(static_cast<istream&>(streamIn));
 }
-bool XMLNode::parseStream(istream& streamIn) {
+bool HTMLNode::parseStream(istream& streamIn) {
 	unsigned int mode = 0;
-	stack<shared_ptr<XMLNode>> documentStack;
+	stack<shared_ptr<HTMLNode>> documentStack;
 	/* 2018-06-04 Revision 2
 	 * bottom of the stack is the document node.
 	 * */
-	documentStack.push(shared_from_this());
 	return StreamScanner::scanStream(streamIn,
 			[this, &mode, &documentStack](string& streamBuffer, bool final) {
 				streamBufferHandle(streamBuffer, final, documentStack, mode);
 			});
 }
-bool XMLNode::streamBufferHandle(string& streamBuffer, bool final,
-		stack<shared_ptr<XMLNode>>& documentStack, unsigned int& mode) {
+bool HTMLNode::streamBufferHandle(string& streamBuffer, bool final,
+		stack<shared_ptr<HTMLNode>>& documentStack, unsigned int& mode) {
 	size_t tagOpenPos, tagEndPos;
-	string tagPop, matchGroupString, temp;
+	string tagPop, temp;
 	while (true) {
 		if (mode == 0) {
 			// Expecting opening angle bracket for a tag
-			tagOpenPos = (unsigned int) streamBuffer.find("<");
+			tagOpenPos = streamBuffer.find("<");
 			if (tagOpenPos != string::npos) {
 				/* opening angle bracket for a tag
 				 * we assume that text before this is the value of current xml node
 				 */
 				mode = 1;
-				documentStack.top()->valueAppend(
-						streamBuffer.substr(0, tagOpenPos));
+				if (documentStack.empty()) {
+					valueAppend(streamBuffer.substr(0, tagOpenPos));
+				} else {
+					documentStack.top()->valueAppend(
+							streamBuffer.substr(0, tagOpenPos));
+				}
 				streamBuffer.erase(0, tagOpenPos);
 				tagOpenPos = 0;
 			} else {
 				break;
 			}
 		} else if (mode == 1) {
+			if (documentStack.empty()) {
+				//cout << "last tag: none\n";
+			} else {
+				//cout << "last tag: " << documentStack.top()->getName() << "\n";
+				//cout << "BUFFER: " << streamBuffer << "\n";
+			}
 			// expecting ending angle bracket for a tag
-			tagEndPos = (unsigned int) streamBuffer.find(">");
-			temp = streamBuffer.substr(0, tagEndPos + 1);
-			std::smatch m;
+			tagEndPos = streamBuffer.find(">");
+			//std::smatch m;
 			if (tagEndPos != string::npos) {
 				// let's use regex to grab the tag name between the angled brackets
 				// let's first check if we just ended an ending tag </>
 				//std::smatch m;
-				regex_match(temp, m, tagEndRegex);
-				if (!m.empty()) {
+				//regex_match(temp, m, tagEndRegex);
+				temp = streamBuffer.substr(1, tagEndPos - 1);
+				if (temp.length() > 0 && temp.substr(0, 1) == "/") {
 					/* extract matched group
 					 * a .trim() method would be great...
 					 */
-					try {
-						matchGroupString = m[1].str(); // match group
-					} catch (...) {
-						matchGroupString = "";
-					}
+					// tag name is the first word
+					string tagName = temp.substr(1, temp.find(' '));
+					//cout << "</tag>: " << tagName << "\n";
 					/*string s;
 					 s.append("</").append(matchGroupString).append(">\n");
 					 cout << s;*/
-					documentStack.top()->nodePop(matchGroupString,
-							documentStack);
-				} else {
-					// now check if we just ended an opening tag <>
-					//std::smatch m;
-					regex_match(temp, m, tagOpenRegex);
-					if (!m.empty()) {
-						try {
-							matchGroupString = m[1].str(); // match group
-						} catch (...) {
-							matchGroupString = "";
+					nodePop(tagName, documentStack);
+				} else if (temp.length() > 0) {
+					/* now check if we just ended an opening tag <>
+					 * if the last tagName was "script"
+					 * we check if the new tag is recognizable, and if not
+					 * then just add the buffer up to ">" for the current node
+					 * 2018-06-29 regex keeps crashing at this line, so we removed it
+					 */
+					//regex_match(temp, m, tagOpenRegex);
+					// tag name is the first word
+					size_t spacePosFirst = temp.find(' ');
+					string tagName = temp.substr(0, spacePosFirst);
+					if (!documentStack.empty()
+							&& documentStack.top()->getName() == "script"
+							&& tagName != "div") {
+						// add to script node value
+						documentStack.top()->valueAppend(
+								streamBuffer.substr(0, tagEndPos + 1));
+					} else {
+						if (!documentStack.empty()
+								&& documentStack.top()->getName() == "script") {
+							// get out of script node
+							nodePop(documentStack.top()->getName(),
+									documentStack);
 						}
-						/*string s;
-						 s.append("<").append(matchGroupString).append(">\n");
-						 cout << s;*/
-						documentStack.top()->nodePush(matchGroupString,
-								documentStack);
+						// add the new node
+						string attributes;
+						if (spacePosFirst != string::npos) {
+							attributes = temp.substr(spacePosFirst + 1);
+						}
+						// pop html node before inserting html node. no nested html
+						if (tagName == "html") {
+							nodePop(tagName, documentStack);
+						}
+						if (documentStack.empty()) {
+							nodePush(tagName, documentStack);
+						} else {
+							documentStack.top()->nodePush(tagName,
+									documentStack);
+						}
+						documentStack.top()->setAttributes(attributes);
+						// End nodes that do not require end tag
+						if (temp.substr(temp.length() - 1) == "/"
+								|| temp.substr(0, 1) == "!" || tagName == "meta"
+								|| tagName == "link" || tagName == "br"
+								|| tagName == "input" || tagName == "img") {
+							nodePop(tagName, documentStack);
+						}
 					}
+
 				}
 				// erase to the end of the ending angle bracket ">"
 				streamBuffer.erase(0, tagEndPos + 1);
@@ -322,134 +452,335 @@ bool XMLNode::streamBufferHandle(string& streamBuffer, bool final,
 		}
 	}
 	if (final) {
-		documentStack.top()->valueAppend(streamBuffer);
+		if (documentStack.empty()) {
+			valueAppend(streamBuffer);
+		} else {
+			documentStack.top()->valueAppend(streamBuffer);
+		}
 	}
 	return true;
 }
 
-bool XMLNode::nodePop(string& tagString,
-		stack<shared_ptr<XMLNode>>& documentStack) {
+bool HTMLNode::nodePop(string tagString,
+		stack<shared_ptr<HTMLNode>>& documentStack) {
 	/* pop nodes off stack until end tag is found
 	 * can't go lower than the document root
 	 */
 	string tagPop = "";
+	if (!documentStack.empty()) {
+		tagPop = documentStack.top()->getName();
+	}
 	if (tagString.length() > 0) {
 		/* 2018-06-04 Revision 2
 		 * bottom of the stack is the document node. These reduces number of arguments passed.
 		 * */
-		while (documentStack.size() > 1 && tagPop != tagString) {
-			tagPop = documentStack.top()->getName();
+		while (!documentStack.empty() && tagPop != tagString && tagPop != "html") {
 			documentStack.pop();
+			if (!documentStack.empty()) {
+				tagPop = documentStack.top()->getName();
+			}
 			/* 2018-06-04 Revision 2
-			 * XMLNode.getParent() was removed because it could lead to circular references
+			 * HTMLNode.getParent() was removed because it could lead to circular references
 			 * */
+		}
+		if (!documentStack.empty() && tagPop == tagString) {
+			documentStack.pop();
 		}
 	}
 	return true;
 }
 
-bool XMLNode::nodePush(string& tagString,
-		stack<shared_ptr<XMLNode>>& documentStack) {
+bool HTMLNode::nodePush(string tagString,
+		stack<shared_ptr<HTMLNode>>& documentStack) {
 	if (tagString.length() > 0) {
-		documentStack.push(documentStack.top()->addChild(tagString));
+		if (documentStack.empty()) {
+			documentStack.push(addChild(tagString));
+		} else {
+			documentStack.push(documentStack.top()->addChild(tagString));
+		}
 	}
 	return true;
 }
-void XMLNode::valueAppend(string str) {
+void HTMLNode::setAttributes(string str) {
+	attributes_ = str;
+}
+void HTMLNode::valueAppend(string str) {
 	value_.append(str);
 }
-string XMLNode::getName() {
+string HTMLNode::getName() {
 	return name_;
 }
-string XMLNode::getValue() {
+string HTMLNode::getAttributes() {
+	return attributes_;
+}
+string HTMLNode::getValue() {
 	return value_;
 }
-shared_ptr<XMLNode> XMLNode::addChild(string str) {
-	shared_ptr<XMLNode> childNode = make_shared<XMLNode>(str);
+shared_ptr<HTMLNode> HTMLNode::addChild(string str) {
+	shared_ptr<HTMLNode> childNode = make_shared<HTMLNode>(str);
 	//cout << "child " << str << " name: "<<name << endl;
 	childNodes.push_back(childNode);
 	return childNode;
 }
-shared_ptr<XMLNode> XMLNode::getChild(unsigned int index) {
-	shared_ptr<XMLNode> nodeReturn;
-	try {
-		nodeReturn = childNodes.at(index);
-	} catch (...) {
-		// nothing
-	}
-	return nodeReturn;
-}
-bool XMLNode::findChild(string name, shared_ptr<XMLNode>& returnNode,
-		unsigned int index) {
-	unsigned int findCount, i, n;
-	bool returnValue = false;
-	findCount = 0;
-	n = static_cast<unsigned int>(childNodes.size());
-	for (i = 0; i < n; i++) {
-		if (childNodes[i]->name_ == name) {
-			if (findCount == index) {
-				returnNode = childNodes[i];
-				returnValue = true;
-				break;
-			}
-			findCount++;
+void HTMLNode::findName(HTMLNode& matches, string str) {
+	for (auto i : childNodes) {
+		if (i->getName().find(str) != string::npos) {
+			matches.push_back(i);
 		}
+		i->findName(matches, str);
 	}
-	return returnValue;
 }
-unsigned int XMLNode::childrenSize() {
-	return static_cast<unsigned int>(childNodes.size());
-}
-unsigned int XMLNode::findChildSize(string name) {
-	unsigned int findCount, i, n;
-	findCount = 0;
-	n = static_cast<unsigned int>(childNodes.size());
-	for (i = 0; i < n; i++) {
-		if (childNodes[i]->name_ == name) {
-			findCount++;
+void HTMLNode::findAttribute(HTMLNode& matches, string str) {
+	for (auto i : childNodes) {
+		if (i->getAttributes().find(str) != string::npos) {
+			matches.push_back(i);
 		}
+		i->findAttribute(matches, str);
 	}
-	return findCount;
+}
+void HTMLNode::findValue(HTMLNode& matches, string str) {
+	for (auto i : childNodes) {
+		if (i->getValue().find(str) != string::npos) {
+			matches.push_back(i);
+		}
+		i->findValue(matches, str);
+	}
+}
+string HTMLNode::toString(string prefix) {
+	string output;
+	for (auto i : childNodes) {
+		output.append(prefix).append(i->getName()).append(" ").append(
+				i->getAttributes().substr(0, 30));
+		output.append(" ").append(i->getValue().substr(0, 30)).append("\n");
+		output.append(i->toString(prefix + "\t"));
+	}
+	return output;
 }
 
 /*
  * HTMLDocument Implementation
  */
+void HTMLDocument::setTitle(string str) {
+	title_ = str;
+}
+void HTMLDocument::setLink(string str) {
+	link_ = str;
+}
+string HTMLDocument::getTitle() {
+	return title_;
+}
+string HTMLDocument::getLink() {
+	return link_;
+}
+string HTMLDocument::toString(string prefix, unsigned int depth) {
+	stringstream output;
+	output << prefix << left << setw(20) << setfill(' ')
+			<< getTitle().substr(0, 19) << setw(10) << fixed << setprecision(6)
+			<< pageRank << getLink();
+	if (depth > 0) {
+		for (auto docOutIt : documentOutList) {
+			output << "\n";
+			output << docOutIt->toString(prefix + "\t", depth - 1);
+		}
+	}
+	return output.str();
+}
+string HTMLDocument::calculationToString() {
+	stringstream output;
+	output << left << setw(20) << setfill(' ') << getTitle().substr(0, 19)
+			<< setw(10) << fixed << setprecision(6) << pageRank << setw(10)
+			<< pageRankLast << setw(10) << pageRankDifference;
+	return output.str();
+}
 
 /*
  * DocumentDatabase Implementation
  */
 void DocumentDatabase::createGraph() {
-
+	for (auto docItX : documentTable) {
+		size_t n = adjacencyMatrix.size();
+		adjacencyMatrix.push_back(make_shared<vector<bool>>());
+		for (auto docItY : documentTable) {
+			string titleX = docItX.second->getTitle();
+			string titleY = docItY.second->getTitle();
+			auto foundIt = find_if(docItX.second->begin(), docItX.second->end(),
+					[titleY](const shared_ptr<HTMLDocument> arg)->bool {
+						return arg->getTitle() == titleY;
+					});
+			if (foundIt == docItX.second->end()) {
+				//cout << titleX << " : " << titleY << " not found\n";
+				adjacencyMatrix[n]->push_back(false);
+			} else {
+				//cout << titleX << " : " << titleY << " found\n";
+				adjacencyMatrix[n]->push_back(true);
+			}
+		}
+	}
 }
 
 void DocumentDatabase::calculatePageRank() {
+	// precision of 3 decimal places
+	while (pageRankDifferenceTotal > 0.001 || pageRankIterations < 4) {
+		// One calculation
+		calculatePageRankIteration(dampingFactor);
+		cout << calculationToString() << "\n\n";
+	}
+}
 
+void DocumentDatabase::calculatePageRankIteration(double d) {
+	// One calculation
+	size_t x = 0;
+	pageRankDifferenceTotal = 0;
+	pageRankIterations++;
+	for (auto graphXIt : documentTable) {
+		size_t y = 0;
+		double pageRank = 0;
+		// += inbound document page rank / inbound document oubound links #
+		for (auto graphYIt : documentTable) {
+			if (adjacencyMatrix[x]->at(y)) {
+				if (graphYIt.second->pageOutNum() != 0) {
+					pageRank += graphYIt.second->pageRank
+							/ graphYIt.second->pageOutNum();
+				}
+			}
+			y++;
+		}
+		// *d + (1-d)
+		x++;
+		pageRank *= d;
+		pageRank += 1 - d;
+		graphXIt.second->pageRankLast = graphXIt.second->pageRank;
+		graphXIt.second->pageRank = pageRank;
+		graphXIt.second->pageRankDifference = abs(
+				graphXIt.second->pageRankLast - graphXIt.second->pageRank);
+		pageRankDifferenceTotal += graphXIt.second->pageRankDifference;
+	}
 }
 
 string DocumentDatabase::getAllPageRank() {
 	return "";
 }
 
+string DocumentDatabase::toString(string prefix, unsigned int depth) {
+	stringstream output;
+	output << left << setw(20) << setfill(' ') << "Title" << setw(10)
+			<< "Page Rank" << "URL\n";
+	for (auto docIt : documentTable) {
+		output << docIt.second->toString("", depth) << "\n";
+	}
+	return output.str();
+}
+
+string DocumentDatabase::calculationToString() {
+	stringstream output;
+	output << "Iteration: #" << pageRankIterations << "\n";
+	output << left << setw(20) << setfill(' ') << "Title" << setw(10)
+			<< "Page Rank" << setw(10) << "Last" << "Difference\n";
+	for (auto docIt : documentTable) {
+		output << docIt.second->calculationToString() << "\n";
+	}
+	output << setw(50) << setfill('-') << "" << "\n";
+	output << left << fixed << setprecision(6) << setw(20) << setfill(' ')
+			<< "Total" << setw(20) << "" << pageRankDifferenceTotal;
+	return output.str();
+}
+
+string DocumentDatabase::graphToString() {
+	stringstream output;
+// header
+	output << setw(4) << "";
+	for (auto graphXIt : documentTable) {
+		output << setw(4) << graphXIt.second->getTitle().substr(0, 3);
+	}
+// content
+	size_t n = 0;
+	for (auto graphYIt : documentTable) {
+		output << "\n" << setw(4) << graphYIt.second->getTitle().substr(0, 3);
+		for (auto matrixIt : *adjacencyMatrix[n]) {
+			output << setw(4);
+			if (matrixIt) {
+				output << "X";
+			} else {
+				output << "O";
+			}
+		}
+		n++;
+	}
+	return output.str();
+}
+
 /*
  * DocumentExtractor Implementation
  */
-void DocumentExtractor::extract(XMLNode& XML_Document,
+void DocumentExtractor::extract(HTMLNode& XML_Document,
 		DocumentDatabase& documentDatabase) {
-
+	regex hrefRegex("href=\"(.*?)\"");
+	std::smatch m;
+	HTMLNode htmlMatches;
+	XML_Document.findName(htmlMatches, "html");
+	for (auto htmlDocIt : htmlMatches) {
+		// find title
+		string title;
+		HTMLNode titleMatches;
+		htmlDocIt->findName(titleMatches, "title");
+		// Intentional overwrite
+		for (auto htmlDocTitleIt : titleMatches) {
+			title = htmlDocTitleIt->getValue();
+		}
+		// add document
+		shared_ptr<HTMLDocument> HTML_document;
+		auto htmlDocFoundIt = documentDatabase.find(title);
+		if (htmlDocFoundIt == documentDatabase.end()) {
+			// new document
+			HTML_document = make_shared<HTMLDocument>(title);
+			documentDatabase.insert(title, HTML_document);
+		} else {
+			// existing document
+			HTML_document = htmlDocFoundIt->second;
+		}
+		// find outbound links
+		HTMLNode divMatches;
+		htmlDocIt->findAttribute(divMatches, "class=\"other-links\"");
+		HTMLNode aMatches;
+		divMatches.findName(aMatches, "a");
+		//cout << aMatches.toString() << "\n";
+		for (auto aIt : aMatches) {
+			string titleOut = aIt->getValue();
+			if (titleOut.length() > 0) {
+				shared_ptr<HTMLDocument> HTML_documentOut;
+				auto HTML_documentIterator = documentDatabase.find(titleOut);
+				if (HTML_documentIterator == documentDatabase.end()) {
+					// add outbound document
+					HTML_documentOut = make_shared<HTMLDocument>(titleOut);
+					documentDatabase.insert(titleOut, HTML_documentOut);
+				} else {
+					// existing document
+					HTML_documentOut = HTML_documentIterator->second;
+				}
+				// set the document link
+				string attributeStr = aIt->getAttributes();
+				regex_match(attributeStr, m, hrefRegex);
+				if (m.length() > 1) {
+					HTML_documentOut->setLink(m[1]);
+				}
+				HTML_document->addDocumentOut(HTML_documentOut);
+			}
+		}
+	}
 }
 
 /*
  * main & interface
  * Rules for calculating page rank:
  * - parse the poorly formed "HTML" document
- * - Generate frequency table with priority queue
- * - Create binary tree from priority queue
- * - Encrypt the input file as an encrypted binary file
+ * - Extract relevant document data
+ * - Generate adjacency matrix
+ * - Calculate page rank
+ * - Display results on console
  */
 int main() {
 	FileHandler fh;
-	XMLNode document;
+	HTMLNode document;
 	DocumentExtractor documentExtractor;
 	DocumentDatabase documentDatabase;
 	string fileNameHTML;
@@ -459,7 +790,7 @@ int main() {
 	cout << "Opening the input file.\n";
 	try {
 		fh.readStream(fileNameHTML, fileStreamIn);
-		cout << "Parsing the HTML file. \"" << fileNameHTML << "\"\n";
+		cout << "Parsing the HTML file \"" << fileNameHTML << "\".\n";
 		/* we pass a file stream instead of a reading the whole file
 		 * into memory to reduce memory usage.
 		 */
@@ -467,46 +798,26 @@ int main() {
 		cout << "Closing input file.\n";
 		fh.close(fileStreamIn);
 		cout << "Extracting relevant XML data to the document database.\n";
-		documentExtractor.extract(document, documentDatabase);
 		/* The Document Extractor takes an XML document and extracts
 		 * the lab specific information into a document database
 		 */
+		documentExtractor.extract(document, documentDatabase);
+		//cout << documentDatabase.toString() << "\n";
 		cout << "Creating graph from documents.\n";
 		documentDatabase.createGraph();
+		cout << documentDatabase.graphToString() << "\n\n";
 		cout << "Calculating Page Ranks.\n";
 		documentDatabase.calculatePageRank();
 		cout << "Page rank:\n";
-		cout << documentDatabase.getAllPageRank() << "\n";
+		cout << documentDatabase.toString("", 0) << "\n";
 	} catch (int& exceptionCode) {
 		switch (exceptionCode) {
 		case 1:
-			cout << "[Error] Could not open the input file \"" << fileStreamIn
+			cout << "[Error] Could not open the input file \"" << fileNameHTML
 					<< "\"\n";
 			break;
-		case 2:
-			cout << "[Error] Could not open the output file\n";
-			break;
 		case 3:
-			cout
-					<< "[Error] Could not parse the input stream as a character frequency table.\m";
-			break;
-		case 4:
-			cout << "[Error] Could not build the priority queue.\n";
-			break;
-		case 5:
-			cout << "[Error] Could not build the priority queue tree.\n";
-			break;
-		case 6:
-			cout << "[Error] Could not build the binary string table.\n";
-			break;
-		case 7:
-			cout << "[Error] Could not compress the file.\n";
-			break;
-		case 8:
-			cout << "[Error] Could not extract the file.\n";
-			break;
-		case 9:
-			cout << "[Error] Could not close the input file \"" << fileStreamIn
+			cout << "[Error] Could not close the input file \"" << fileNameHTML
 					<< "\"\n";
 			break;
 		}
